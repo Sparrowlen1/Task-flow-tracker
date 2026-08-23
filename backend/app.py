@@ -12,13 +12,38 @@ load_dotenv()
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///taskflow.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'dev-secret-key-change-in-production')
+app.config['JWT_SECRET_KEY'] = 'dev-secret-key-change-in-production'
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24)
 
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 jwt = JWTManager(app)
-CORS(app, supports_credentials=True)
+CORS(app, supports_credentials=True, origins='http://localhost:5173')
+
+# -------------------- JWT ERROR HANDLERS --------------------
+@jwt.invalid_token_loader
+def invalid_token_callback(error):
+    print(f"Invalid token error: {error}")
+    return jsonify({'error': 'Invalid token', 'details': str(error)}), 422
+
+@jwt.unauthorized_loader
+def unauthorized_callback(error):
+    print(f"Unauthorized error: {error}")
+    return jsonify({'error': 'Missing or invalid token', 'details': str(error)}), 401
+
+@jwt.expired_token_loader
+def expired_token_callback(jwt_header, jwt_data):
+    print(f"Expired token: {jwt_data}")
+    return jsonify({'error': 'Token expired', 'details': 'Please login again'}), 401
+
+@jwt.revoked_token_loader
+def revoked_token_callback(jwt_header, jwt_data):
+    return jsonify({'error': 'Token revoked'}), 401
+
+@jwt.token_verification_failed_loader
+def verification_failed_callback(jwt_header, jwt_data):
+    print(f"Verification failed: {jwt_header} - {jwt_data}")
+    return jsonify({'error': 'Token verification failed'}), 422
 
 # -------------------- MODELS --------------------
 class User(db.Model):
@@ -58,41 +83,56 @@ def register():
 
 @app.route('/api/login', methods=['POST'])
 def login():
+    print("===== LOGIN REQUEST =====")
     data = request.get_json()
+    print(f"Username: {data.get('username') if data else 'No data'}")
+
     if not data or not data.get('username') or not data.get('password'):
         return jsonify({'error': 'Username and password required'}), 400
 
     user = User.query.filter_by(username=data['username']).first()
     if not user:
+        print(f"User not found: {data['username']}")
         return jsonify({'error': 'Invalid credentials'}), 401
 
     from werkzeug.security import check_password_hash
     if not check_password_hash(user.password_hash, data['password']):
+        print(f"Password mismatch for user: {data['username']}")
         return jsonify({'error': 'Invalid credentials'}), 401
 
-    access_token = create_access_token(identity=user.id)
+    # FIX: Convert user.id to string
+    access_token = create_access_token(identity=str(user.id))
+    print(f"Login successful for user: {data['username']}, token generated")
     return jsonify({'access_token': access_token, 'user_id': user.id, 'username': user.username}), 200
 
 @app.route('/api/me', methods=['GET'])
 @jwt_required()
 def get_current_user():
-    user_id = get_jwt_identity()
+    print("===== /api/me CALLED =====")
+    # FIX: Convert identity back to int
+    user_id = int(get_jwt_identity())
+    print(f"User ID from token: {user_id}")
     user = User.query.get(user_id)
     if not user:
+        print(f"User not found with ID: {user_id}")
         return jsonify({'error': 'User not found'}), 404
+    print(f"User found: {user.username}")
     return jsonify({'id': user.id, 'username': user.username}), 200
 
 # -------------------- TASK ROUTES (CRUD + Pagination) --------------------
 @app.route('/api/tasks', methods=['GET'])
 @jwt_required()
 def get_tasks():
-    user_id = get_jwt_identity()
+    print("===== /api/tasks CALLED =====")
+    user_id = int(get_jwt_identity())  # FIX: convert to int
+    print(f"User ID from token: {user_id}")
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 10, type=int)
 
     query = Task.query.filter_by(user_id=user_id)
     paginated = query.paginate(page=page, per_page=per_page, error_out=False)
 
+    print(f"Found {len(paginated.items)} tasks for user {user_id}")
     return jsonify({
         'tasks': [{
             'id': t.id,
@@ -110,7 +150,7 @@ def get_tasks():
 @app.route('/api/tasks/<int:task_id>', methods=['GET'])
 @jwt_required()
 def get_task(task_id):
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())  # FIX: convert to int
     task = Task.query.filter_by(id=task_id, user_id=user_id).first()
     if not task:
         return jsonify({'error': 'Task not found'}), 404
@@ -126,7 +166,7 @@ def get_task(task_id):
 @app.route('/api/tasks', methods=['POST'])
 @jwt_required()
 def create_task():
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())  # FIX: convert to int
     data = request.get_json()
 
     if not data or not data.get('title'):
@@ -156,7 +196,7 @@ def create_task():
 @app.route('/api/tasks/<int:task_id>', methods=['PATCH'])
 @jwt_required()
 def update_task(task_id):
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())  # FIX: convert to int
     task = Task.query.filter_by(id=task_id, user_id=user_id).first()
     if not task:
         return jsonify({'error': 'Task not found'}), 404
@@ -185,7 +225,7 @@ def update_task(task_id):
 @app.route('/api/tasks/<int:task_id>', methods=['DELETE'])
 @jwt_required()
 def delete_task(task_id):
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())  # FIX: convert to int
     task = Task.query.filter_by(id=task_id, user_id=user_id).first()
     if not task:
         return jsonify({'error': 'Task not found'}), 404

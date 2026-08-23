@@ -19,6 +19,7 @@ function Login({ setToken }) {
       });
       const data = await res.json();
       if (res.ok) {
+        console.log('Login response:', data);
         setToken(data.access_token);
         navigate('/dashboard');
       } else {
