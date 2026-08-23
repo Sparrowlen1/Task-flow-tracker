@@ -21,20 +21,25 @@ function App() {
   }, [token]);
 
   const fetchUser = async () => {
-    try {
-      const res = await fetch('http://localhost:5000/api/me', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setUser(data);
-      } else {
-        logout();
-      }
-    } catch {
+  try {
+    console.log('Fetching user with token:', token);
+    const res = await fetch('http://localhost:5000/api/me', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    console.log('Response status:', res.status);
+    if (res.ok) {
+      const data = await res.json();
+      console.log('User data:', data);
+      setUser(data);
+    } else {
+      console.log('Token validation failed, logging out');
       logout();
     }
-  };
+  } catch (error) {
+    console.log('Network error:', error);
+    logout();
+  }
+};
 
   const logout = () => {
     setToken('');
