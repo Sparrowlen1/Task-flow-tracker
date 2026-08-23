@@ -1,0 +1,57 @@
+.dashboard {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.dashboard-header {
+  margin-bottom: 2rem;
+  text-align: center;
+}
+
+.dashboard-header h2 {
+  font-size: 2rem;
+  color: #1a1a2e;
+}
+
+.dashboard-header p {
+  color: #555;
+}
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.pagination button {
+  padding: 0.5rem 1.2rem;
+  background: #4a6cf7;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 0.2s;
+}
+
+.pagination button:hover:not(:disabled) {
+  background: #3a56d4;
+}
+
+.pagination button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.pagination span {
+  font-weight: 500;
+  color: #333;
+}
+
+.error {
+  color: #e74c3c;
+  text-align: center;
+  margin: 1rem 0;
+}
